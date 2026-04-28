@@ -1,11 +1,14 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { Image } from "expo-image";
 import { ReceiptText, Clock, MessageCircle } from "lucide-react-native";
 import { colors } from "../../assets/theme";
+import { useNavigation } from "@react-navigation/native";
 
-const ItemSmall = ({ item }) => {
+
+const ItemSmall = ({item}) => {
+  const navigation = useNavigation();
   return (
-    <View style={styles.cardItem}>
+    <TouchableOpacity style={styles.cardItem} onPress={() => navigation.navigate('BlogDetail', {blogId: item.id})}>
       <Image
         style={styles.cardImage}
         source={{
@@ -36,9 +39,11 @@ const ItemSmall = ({ item }) => {
           <Text style={styles.cardText}>{item.totalComments}</Text>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
+
+
 
 export default ItemSmall;
 

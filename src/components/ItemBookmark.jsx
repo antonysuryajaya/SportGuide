@@ -2,6 +2,8 @@ import { StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { ReceiptText, Clock, MessageCircle } from "lucide-react-native";
 import { Image } from "expo-image";
 import { colors } from "../../assets/theme";
+import {useNavigation} from '@react-navigation/native';
+
 
 const truncateTextByWords = (text, maxWords) => {
   if (!text) return "";
@@ -13,12 +15,12 @@ const truncateTextByWords = (text, maxWords) => {
 };
 
 const ItemBookmark = ({ item, onPress }) => {
+  const navigation = useNavigation();
   return (
-    <TouchableOpacity
+    <TouchableOpacity style={styles.cardItem} onPress={()=>navigation.navigate('BlogDetail', {blogId: item.id})}>
       style={styles.cardItem}
       activeOpacity={0.9}
       onPress={() => console.log("Card Pressed")}
-    >
       <View style={styles.imageWrapper}>
         <Image
           style={styles.cardImage}

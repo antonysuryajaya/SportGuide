@@ -1,4 +1,5 @@
-import Profile from "./src/screens/Profile.jsx";
+import { NavigationContainer } from "@react-navigation/native";
+import Router from "./src/navigation/Router";
 import { fontType } from "./assets/theme";
 import { useFonts } from "expo-font";
 export default function App() {
@@ -6,5 +7,9 @@ export default function App() {
   if (!loaded) {
     return null;
   }
-  return <Profile />;
+  return (
+    <NavigationContainer>
+      <Router />
+    </NavigationContainer>
+  );
 }
