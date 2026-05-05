@@ -61,7 +61,7 @@ export default function Home() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.green()} />
       <View style={styles.header}>
-        <Text style={styles.title}>SportGuide.</Text>
+        <Text style={styles.title}>SportGuide</Text>
         <Menu color={colors.orange()} variant="Linear" size={24} />
       </View>
       <View style={styles.listCategory}>
