@@ -15,6 +15,11 @@ import BlogDetail from "../screens/BlogDetail";import {
   User,
 } from "lucide-react-native";
 import { colors } from "../../assets/theme";
+import Search from "../screens/Search";
+import AddBlogForm from "../screens/AddBlogForm";
+import SplashScreen from "../screens/SplashScreen";
+import Register from "../screens/Register";
+import Login from "../screens/Login";
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -80,7 +85,7 @@ function MainApp() {
 
 const Router = () => {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator initialRouteName="SplashScreen">
       <Stack.Screen
         name="MainApp"
         component={MainApp}
@@ -90,6 +95,64 @@ const Router = () => {
         name="BlogDetail"
         component={BlogDetail}
         options={{
+          headerShown: false,
+          animationEnabled: true,
+          animationTypeForReplace: "pop",
+          gestureEnabled: true,
+          gestureDirection: "horizontal",
+          ...TransitionPresets.SlideFromRightIOS,
+        }}/>
+        <Stack.Screen
+        name="SearchPage"
+        component={Search}
+        options={{
+          headerShown: false,
+          animationEnabled: true,
+          animationTypeForReplace: "pop",
+          gestureEnabled: true,
+          gestureDirection: "horizontal",
+          ...TransitionPresets.SlideFromRightIOS,
+        }}
+      />
+<Stack.Screen
+        name="AddBlog"
+        component={AddBlogForm}
+        options={{
+          headerShown: false, 
+          animationEnabled: true,
+          animationTypeForReplace: 'pop',
+          gestureEnabled: true,
+          gestureDirection : 'horizontal',
+          ...TransitionPresets.SlideFromRightIOS,
+        }}/>
+        <Stack.Screen
+        name="SplashScreen"
+        component={SplashScreen}
+        options={{ 
+          headerShown: false,
+          animationEnabled: true,
+          animationTypeForReplace: "pop",
+          gestureEnabled: true,
+          gestureDirection: "horizontal",
+          ...TransitionPresets.SlideFromRightIOS,
+        }}
+      />
+      <Stack.Screen
+        name="Register"
+        component={Register}
+        options={{ 
+          headerShown: false,
+          animationEnabled: true,
+          animationTypeForReplace: "pop",
+          gestureEnabled: true,
+          gestureDirection: "horizontal",
+          ...TransitionPresets.SlideFromRightIOS,
+        }}
+      />
+      <Stack.Screen
+        name="Login"
+        component={Login}
+        options={{ 
           headerShown: false,
           animationEnabled: true,
           animationTypeForReplace: "pop",

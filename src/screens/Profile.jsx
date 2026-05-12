@@ -6,13 +6,16 @@ import {
   View,
   TouchableOpacity,
 } from "react-native";
-import { Settings } from "lucide-react-native";
 import { Image } from "expo-image";
 import { ProfileData } from "../data/profiledata";
 import { BlogList } from "../data/blogs";
 import ItemSmall from "../components/ItemSmall";
 import { colors } from "../../assets/theme";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Settings, Edit } from "lucide-react-native";
+import { useNavigation } from "@react-navigation/native";
+import { Pressable } from "react-native";
+
 
 const formatNumber = (number) => {
   if (!number) return "0";
@@ -29,8 +32,8 @@ const formatNumber = (number) => {
 };
 
 const data = BlogList.slice(5);
-
 const Profile = () => {
+  const navigation = useNavigation();
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -90,6 +93,18 @@ const Profile = () => {
           ))}
         </View>
       </ScrollView>
+      <Pressable
+        style={({ pressed }) => [
+          styles.floatingButton,
+          {
+            opacity: pressed ? 0.8 : 1,
+            transform: [{ scale: pressed ? 0.95 : 1 }],
+          },
+        ]}
+        onPress={() => navigation.navigate("AddBlog")}
+      >
+        <Edit color={colors.green()} size={20} />
+      </Pressable>
     </SafeAreaView>
   );
 };
@@ -120,6 +135,22 @@ const styles = StyleSheet.create({
   blogList: {
     paddingVertical: 10,
     gap: 10,
+  },
+  floatingButton: {
+    backgroundColor: colors.blue(),
+    padding: 15,
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    borderRadius: 10,
+    shadowColor: colors.blue(),
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
   },
 });
 
