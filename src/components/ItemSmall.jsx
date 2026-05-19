@@ -3,12 +3,15 @@ import { Image } from "expo-image";
 import { ReceiptText, Clock, MessageCircle } from "lucide-react-native";
 import { colors } from "../../assets/theme";
 import { useNavigation } from "@react-navigation/native";
+import { formatDate } from "../utils/formatDate";
 
-
-const ItemSmall = ({item}) => {
+const ItemSmall = ({ item }) => {
   const navigation = useNavigation();
   return (
-    <TouchableOpacity style={styles.cardItem} onPress={() => navigation.navigate('BlogDetail', {blogId: item.id})}>
+    <TouchableOpacity
+      onPress={() => navigation.navigate("BlogDetail", { blogId: item.id })}
+      style={styles.cardItem}
+    >
       <Image
         style={styles.cardImage}
         source={{
@@ -27,23 +30,25 @@ const ItemSmall = ({item}) => {
           }}
         >
           <View style={{ gap: 5, flex: 1 }}>
-            <Text style={styles.cardCategory}>{item.category}</Text>
+            <Text style={styles.cardCategory}>
+              {typeof item.category === "object"
+                ? item.category.name
+                : item.category}
+            </Text>
             <Text style={styles.cardTitle}>{item.title}</Text>
           </View>
-          <ReceiptText color={colors.blue(0.6)} variant="Linear" size={20} />
+          <ReceiptText color={colors.orange(0.6)} variant="Linear" size={20} />
         </View>
         <View style={styles.cardInfo}>
-          <Clock size={10} variant="Linear" color={colors.blue(0.6)} />
-          <Text style={styles.cardText}>{item.createdAt}</Text>
-          <MessageCircle size={10} variant="Linear" color={colors.blue(0.6)} />
+          <Clock size={10} variant="Linear" color={colors.orange(0.6)} />
+          <Text style={styles.cardText}>{formatDate(item?.createdAt)}</Text>
+          <MessageCircle size={10} variant="Linear" color={colors.orange(0.6)} />
           <Text style={styles.cardText}>{item.totalComments}</Text>
         </View>
       </View>
     </TouchableOpacity>
   );
 };
-
-
 
 export default ItemSmall;
 
@@ -68,12 +73,12 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 14,
     fontFamily: "Pjs-Bold",
-    color: colors.green(),
+    color: colors.black(),
   },
   cardText: {
     fontSize: 10,
     fontFamily: "Pjs-Medium",
-    color: colors.blue(0.6),
+    color: colors.orange(0.6),
   },
   cardImage: {
     width: 94,

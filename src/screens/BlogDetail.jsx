@@ -1,80 +1,165 @@
-import { StyleSheet, Text, View, Animated, TouchableOpacity } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import React, { useState, useRef } from "react";
-import { ArrowLeft, Heart, Bookmark, MessageCircle, Share2, MoreVertical } from "lucide-react-native";
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  TouchableOpacity,
+  Animated,
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  Alert
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import React, { useState, useRef, useEffect } from "react";
+import {
+  ArrowLeft,
+  Heart,
+  Bookmark,
+  MessageCircle,
+  Share2,
+  MoreVertical,
+  Edit,
+  Trash,
+} from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
-import { BlogList } from "../data/blogs";
 import { Image } from "expo-image";
 import { colors } from "../../assets/theme";
-
-const formatNumber = (number) => {
-  if (number >= 1000000000) return (number / 1000000000).toFixed(1).replace(/\.0$/, "") + "B";
-  if (number >= 1000000) return (number / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
-  if (number >= 1000) return (number / 1000).toFixed(1).replace(/\.0$/, "") + "K";
-  return number.toString();
-};
+import { formatNumber } from "../utils/formatNumber";
+import { formatDate } from "../utils/formatDate";
+import axios from "axios";
 
 const BlogDetail = ({ route }) => {
-  const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
   const { blogId } = route.params;
-  const selectedBlog = BlogList.find((blog) => blog.id === blogId);
+  const [iconStates, setIconStates] = useState({
+    liked: { variant: "Linear", color: colors.orange(0.6) },
+    bookmarked: { variant: "Linear", color: colors.orange(0.6) },
+  });
+  const [selectedBlog, setSelectedBlog] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [menuVisible, setMenuVisible] = useState(false);
 
-  // --- ANIMATION LOGIC ---
+  useEffect(() => {
+    getBlogById();
+  }, [blogId]);
+
+  const getBlogById = async () => {
+    try {
+      const response = await axios.get(
+        `https://6a0c36795aa893e1015b34cf.mockapi.io/blog/${blogId}`,
+      );
+      setSelectedBlog(response.data);
+      setLoading(false);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const navigateEdit = (id) => {
+    navigation.navigate("EditBlog", { blogId: id });
+  };
+
+  const handleDelete = async () => {
+    Alert.alert(
+      "Delete Blog",
+      "Are you sure you want to delete this blog?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await axios
+                .delete(
+                  `https://69767c4cc0c36a2a995134ea.mockapi.io/blog/${blogId}`,
+                )
+                .then(() => {
+                  navigation.navigate("MainApp", { screen: "Profile" });
+                })
+                .catch((error) => {
+                  console.error(error);
+                });
+              navigation.navigate("MainApp", { screen: "Profile" });
+            } catch (error) {
+              console.error(error);
+              Alert.alert("Error", "Failed to delete blog");
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ],
+      { cancelable: true },
+    );
+  };
+
   const scrollY = useRef(new Animated.Value(0)).current;
-  // diffClamp memastikan nilai berada di rentang 0-52 (tinggi header)
   const diffClampY = Animated.diffClamp(scrollY, 0, 52);
-
   const headerY = diffClampY.interpolate({
     inputRange: [0, 52],
-    outputRange: [0, -70], // Geser lebih jauh agar benar-benar hilang dari view
+    outputRange: [0, -52],
   });
-
   const bottomBarY = diffClampY.interpolate({
     inputRange: [0, 52],
-    outputRange: [0, 100], // Sembunyikan ke bawah
+    outputRange: [0, 52],
   });
 
-  // --- STATE ---
-  const [liked, setLiked] = useState(false);
-  const [bookmarked, setBookmarked] = useState(false);
+  const navigation = useNavigation();
+
+  const toggleIcon = (iconName) => {
+    setIconStates((prevStates) => ({
+      ...prevStates,
+      [iconName]: {
+        variant: prevStates[iconName].variant === "Linear" ? "Bold" : "Linear",
+        color:
+          prevStates[iconName].variant === "Linear"
+            ? colors.blue()
+            : colors.orange(0.6),
+      },
+    }));
+  };
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color={colors.blue()} />
+      </View>
+    );
+  }
 
   if (!selectedBlog) return null;
 
+  const openMenu = () => setMenuVisible(true);
+  const closeMenu = () => setMenuVisible(false);
+
   return (
-    <View style={styles.container}>
-      {/* HEADER */}
-      <Animated.View 
-        style={[
-          styles.header, 
-          { 
-            transform: [{ translateY: headerY }],
-            paddingTop: insets.top + 8, // Adaptasi dengan notch HP
-            height: 52 + insets.top 
-          }
-        ]}
+    <SafeAreaView style={styles.container}>
+      <Animated.View
+        style={[styles.header, { transform: [{ translateY: headerY }] }]}
       >
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <ArrowLeft color={colors.orange(0.6)} size={24} />
         </TouchableOpacity>
-        <View style={{ flexDirection: "row", gap: 20 }}>
+        <View
+          style={{ flexDirection: "row", justifyContent: "center", gap: 20 }}
+        >
           <Share2 color={colors.orange(0.6)} size={24} />
-          <MoreVertical color={colors.orange(0.6)} size={24} />
+          <MoreVertical color={colors.orange(0.6)} size={24} onPress={openMenu} />
         </View>
       </Animated.View>
 
-      {/* CONTENT */}
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}
-        scrollEventThrottle={16} // PENTING: Untuk animasi halus
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
+          { useNativeDriver: true },
         )}
         contentContainerStyle={{
           paddingHorizontal: 24,
-          paddingTop: 62 + insets.top, // Jarak agar konten tidak tertutup header
-          paddingBottom: 100 + insets.bottom,
+          paddingTop: 62,
+          paddingBottom: 54,
         }}
       >
         <Image
@@ -85,49 +170,93 @@ const BlogDetail = ({ route }) => {
         />
 
         <View style={styles.metaContainer}>
-          <Text style={styles.category}>{selectedBlog.category}</Text>
-          <Text style={styles.date}>{selectedBlog.createdAt}</Text>
+          <Text style={styles.category}>
+            {typeof selectedBlog.category === "object"
+              ? selectedBlog.category.name
+              : selectedBlog.category}
+          </Text>
+          <Text style={styles.date}>{formatDate(selectedBlog.createdAt)}</Text>
         </View>
 
         <Text style={styles.title}>{selectedBlog.title}</Text>
         <Text style={styles.content}>{selectedBlog.content}</Text>
       </Animated.ScrollView>
 
-      {/* BOTTOM BAR */}
-      <Animated.View 
-        style={[
-          styles.bottomBar, 
-          { 
-            transform: [{ translateY: bottomBarY }],
-            paddingBottom: insets.bottom + 14 // Adaptasi dengan home indicator (iPhone)
-          }
-        ]}
+      <Animated.View
+        style={[styles.bottomBar, { transform: [{ translateY: bottomBarY }] }]}
       >
         <View style={styles.interactionItem}>
-          <TouchableOpacity onPress={() => setLiked(!liked)}>
+          <TouchableOpacity onPress={() => toggleIcon("liked")}>
             <Heart
-              color={liked ? colors.blue() : colors.orange(0.6)}
-              fill={liked ? colors.blue() : "none"}
+              color={iconStates.liked.color}
+              fill={
+                iconStates.liked.variant === "Bold"
+                  ? iconStates.liked.color
+                  : "none"
+              }
               size={24}
             />
           </TouchableOpacity>
-          <Text style={styles.info}>{formatNumber(selectedBlog.totalLikes)}</Text>
+          <Text style={styles.info}>
+            {formatNumber(selectedBlog.totalLikes)}
+          </Text>
         </View>
 
         <View style={styles.interactionItem}>
           <MessageCircle color={colors.orange(0.6)} size={24} />
-          <Text style={styles.info}>{formatNumber(selectedBlog.totalComments)}</Text>
+          <Text style={styles.info}>
+            {formatNumber(selectedBlog.totalComments)}
+          </Text>
         </View>
 
-        <TouchableOpacity onPress={() => setBookmarked(!bookmarked)}>
+        <TouchableOpacity onPress={() => toggleIcon("bookmarked")}>
           <Bookmark
-            color={bookmarked ? colors.blue() : colors.orange(0.6)}
-            fill={bookmarked ? colors.blue() : "none"}
+            color={iconStates.bookmarked.color}
+            fill={
+              iconStates.bookmarked.variant === "Bold"
+                ? iconStates.bookmarked.color
+                : "none"
+            }
             size={24}
           />
         </TouchableOpacity>
       </Animated.View>
-    </View>
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={menuVisible}
+        onRequestClose={closeMenu}
+      >
+        <Pressable style={styles.modalOverlay} onPress={closeMenu}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                closeMenu();
+                navigateEdit(selectedBlog.id);
+              }}
+            >
+              <Edit color={colors.black()} size={20} />
+              <Text style={styles.menuText}>Edit</Text>
+            </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                closeMenu();
+                handleDelete();
+              }}
+            >
+              <Trash color={colors.red()} size={20} />
+              <Text style={[styles.menuText, { color: colors.red() }]}>
+                Delete
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+    </SafeAreaView>
   );
 };
 
@@ -143,17 +272,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     flexDirection: "row",
     alignItems: "center",
+    height: 52,
+    paddingTop: 8,
+    paddingBottom: 4,
     position: "absolute",
     zIndex: 1000,
     top: 0,
     right: 0,
     left: 0,
     backgroundColor: colors.green(),
-    // Tambahkan sedikit shadow agar header terlihat saat konten scroll di bawahnya
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
   },
   bottomBar: {
     position: "absolute",
@@ -170,7 +297,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.orange(0.1),
   },
   image: {
-    height: 240, // Sedikit lebih tinggi agar proporsional
+    height: 200,
     width: "100%",
     borderRadius: 15,
   },
@@ -186,29 +313,65 @@ const styles = StyleSheet.create({
   },
   info: {
     color: colors.orange(0.6),
+    fontFamily: "Pjs-SemiBold",
     fontSize: 12,
-    fontWeight: "600",
   },
   category: {
     color: colors.blue(),
+    fontFamily: "Pjs-SemiBold",
     fontSize: 12,
-    fontWeight: "600",
   },
   date: {
     color: colors.orange(0.6),
+    fontFamily: "Pjs-Medium",
     fontSize: 10,
   },
   title: {
-    fontSize: 20, // Lebih besar agar menonjol
-    fontWeight: "bold",
+    fontSize: 16,
+    fontFamily: "Pjs-Bold",
     color: colors.black(),
     marginTop: 10,
   },
   content: {
     color: colors.orange(),
-    fontSize: 14,
-    lineHeight: 24,
+    fontFamily: "Pjs-Medium",
+    fontSize: 12,
+    lineHeight: 20,
     marginTop: 15,
-    textAlign: "justify",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.1)",
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: colors.green(),
+    marginTop: 60,
+    marginRight: 24,
+    borderRadius: 10,
+    padding: 8,
+    width: 150,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    gap: 12,
+  },
+  menuText: {
+    fontSize: 14,
+    fontFamily: "Pjs-SemiBold",
+    color: colors.black(),
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: colors.orange(0.1),
+    marginHorizontal: 8,
   },
 });

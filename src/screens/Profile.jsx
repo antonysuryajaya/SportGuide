@@ -1,48 +1,71 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import {
   ScrollView,
   StyleSheet,
   Text,
   View,
   TouchableOpacity,
+  RefreshControl,
+  ActivityIndicator,
 } from "react-native";
+import { Settings, Edit } from "lucide-react-native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { Pressable } from "react-native";
 import { Image } from "expo-image";
 import { ProfileData } from "../data/profiledata";
 import { BlogList } from "../data/blogs";
 import ItemSmall from "../components/ItemSmall";
 import { colors } from "../../assets/theme";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Settings, Edit } from "lucide-react-native";
-import { useNavigation } from "@react-navigation/native";
-import { Pressable } from "react-native";
-
-
-const formatNumber = (number) => {
-  if (!number) return "0";
-  if (number >= 1000000000) {
-    return (number / 1000000000).toFixed(1).replace(/\.0$/, "") + "B";
-  }
-  if (number >= 1000000) {
-    return (number / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
-  }
-  if (number >= 1000) {
-    return (number / 1000).toFixed(1).replace(/\.0$/, "") + "K";
-  }
-  return number.toString();
-};
+import { formatNumber } from "../utils/formatNumber";
+import axios from "axios";
 
 const data = BlogList.slice(5);
+
 const Profile = () => {
   const navigation = useNavigation();
+  const [loading, setLoading] = useState(true);
+  const [blogData, setBlogData] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const getDataBlog = async () => {
+    try {
+      const response = await axios.get(
+        "https://6a0c36795aa893e1015b34cf.mockapi.io/blog",
+      );
+      setBlogData(response.data);
+      setLoading(false);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => {
+      getDataBlog();
+      setRefreshing(false);
+    }, 1500);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      getDataBlog();
+    }, []),
+  );
+
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
-        <Settings color={colors.black()} size={24} />
+        <TouchableOpacity>
+          <Settings color={colors.black()} size={24} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         <View style={styles.profileHeader}>
           <Image
@@ -88,9 +111,13 @@ const Profile = () => {
         </View>
 
         <View style={styles.blogList}>
-          {data.map((item, index) => (
-            <ItemSmall item={item} key={index} />
-          ))}
+          {loading ? (
+            <ActivityIndicator size={"large"} color={colors.blue()} />
+          ) : (
+            blogData.map((item, index) => (
+              <ItemSmall item={item} key={index} />
+            ))
+          )}
         </View>
       </ScrollView>
       <Pressable
@@ -105,7 +132,7 @@ const Profile = () => {
       >
         <Edit color={colors.green()} size={20} />
       </Pressable>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -122,15 +149,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     height: 52,
+    marginTop: 16,
   },
   scrollContent: {
     paddingVertical: 20,
+    paddingHorizontal: 20,
     gap: 10,
   },
   profileHeader: {
     gap: 15,
     alignItems: "center",
-    marginBottom: 10,
   },
   blogList: {
     paddingVertical: 10,
@@ -139,7 +167,7 @@ const styles = StyleSheet.create({
   floatingButton: {
     backgroundColor: colors.blue(),
     padding: 15,
-    position: 'absolute',
+    position: "absolute",
     bottom: 24,
     right: 24,
     borderRadius: 10,
@@ -173,12 +201,11 @@ const profile = StyleSheet.create({
   },
   statsContainer: {
     flexDirection: "row",
-    gap: 30,
-    marginTop: 10,
+    gap: 20,
   },
   statItem: {
     alignItems: "center",
-    gap: 2,
+    gap: 5,
   },
   sum: {
     fontSize: 16,

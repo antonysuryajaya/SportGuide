@@ -3,11 +3,10 @@ import { Plus } from "lucide-react-native";
 import { BlogList } from "../data/blogs";
 import ItemBookmark from "../components/ItemBookmark";
 import { colors } from "../../assets/theme";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 const Bookmark = () => {
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Your Bookmarks</Text>
         <Plus color={colors.black()} size={24} />
@@ -19,7 +18,7 @@ const Bookmark = () => {
           ))}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
