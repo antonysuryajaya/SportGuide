@@ -2,13 +2,12 @@ import {
   StyleSheet,
   Text,
   View,
-  ScrollView,
   TouchableOpacity,
   Animated,
   ActivityIndicator,
   Modal,
   Pressable,
-  Alert
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import React, { useState, useRef, useEffect } from "react";
@@ -27,7 +26,8 @@ import { Image } from "expo-image";
 import { colors } from "../../assets/theme";
 import { formatNumber } from "../utils/formatNumber";
 import { formatDate } from "../utils/formatDate";
-import axios from "axios";
+import { supabase } from "../libs/supabase";
+
 
 const BlogDetail = ({ route }) => {
   const { blogId } = route.params;
@@ -45,15 +45,19 @@ const BlogDetail = ({ route }) => {
 
   const getBlogById = async () => {
     try {
-      const response = await axios.get(
-        `https://6a0c36795aa893e1015b34cf.mockapi.io/blog/${blogId}`,
-      );
+      const response = await supabase
+        .from("blogs")
+        .select("*")
+        .eq("id", blogId)
+        .single();
       setSelectedBlog(response.data);
-      setLoading(false);
     } catch (error) {
       console.error(error);
+    } finally {
+      setLoading(false);
     }
   };
+
 
   const navigateEdit = (id) => {
     navigation.navigate("EditBlog", { blogId: id });
@@ -71,16 +75,12 @@ const BlogDetail = ({ route }) => {
           onPress: async () => {
             try {
               setLoading(true);
-              await axios
-                .delete(
-                  `https://69767c4cc0c36a2a995134ea.mockapi.io/blog/${blogId}`,
-                )
-                .then(() => {
-                  navigation.navigate("MainApp", { screen: "Profile" });
-                })
-                .catch((error) => {
-                  console.error(error);
-                });
+              const { error } = await supabase
+                .from("blogs")
+                .delete()
+                .eq("id", blogId);
+
+              if (error) throw error;
               navigation.navigate("MainApp", { screen: "Profile" });
             } catch (error) {
               console.error(error);
@@ -94,6 +94,7 @@ const BlogDetail = ({ route }) => {
       { cancelable: true },
     );
   };
+
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const diffClampY = Animated.diffClamp(scrollY, 0, 52);

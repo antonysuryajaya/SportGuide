@@ -9,10 +9,13 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { Image } from "expo-image";
 import { ArrowLeft, AddSquare, Add } from "iconsax-react-native";
 import { useNavigation } from "@react-navigation/native";
 import { colors } from "../../assets/theme";
-import axios from "axios";
+import { supabase } from "../libs/supabase";
+import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const EditBlogForm = ({ route }) => {
@@ -30,11 +33,12 @@ const EditBlogForm = ({ route }) => {
   const [blogData, setBlogData] = useState({
     title: "",
     content: "",
-    image:"",
     category: {},
     totalLikes: 0,
     totalComments: 0,
   });
+  const [image, setImage] = useState(null);
+  const [oldImage, setOldImage] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation();
 
@@ -48,26 +52,31 @@ const EditBlogForm = ({ route }) => {
   useEffect(() => {
     const fetchBlog = async () => {
       try {
-        await axios
-        .get(`https://69767c4cc0c36a2a995134ea.mockapi.io/blog/${blogId}`)
-        .then((response)=>{
-            const data = response.data;
-            if (data) {
-                setBlogData({
-                    title: data.title,
-                    content: data.content,
-                    image: data.image,
-                    category: data.category,
-                    totalLikes: data.totalLikes || 0,
-                    totalComments: data.totalComments || 0,
-                });
-            }
-        })
-        .catch(function (error) {
-          console.log(error);
-        });
+        const { data, error } = await supabase
+          .from("blogs")
+          .select("*")
+          .eq("id", blogId)
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          const findCategory = dataCategory.find(
+            (cat) => cat.name === data.category,
+          );
+          setBlogData({
+            title: data.title,
+            content: data.content,
+            category: findCategory || { id: 0, name: data.category },
+            totalLikes: data.totalLikes || 0,
+            totalComments: data.totalComments || 0,
+          });
+          setOldImage(data.image);
+          setImage(data.image);
+        }
       } catch (error) {
         console.error("Error fetching blog:", error);
+        Alert.alert("Error", "Failed to fetch blog data");
       } finally {
         setLoading(false);
       }
@@ -76,30 +85,91 @@ const EditBlogForm = ({ route }) => {
     fetchBlog();
   }, [blogId]);
 
+  const handleImagePick = async () => {
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permissionResult.granted) {
+      Alert.alert(
+        "Permission required",
+        "Permission to access the gallery is required.",
+      );
+      return;
+    }
+
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaType.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      const manipulatedResult = await ImageManipulator.manipulateAsync(
+        result.assets[0].uri,
+        [{ resize: { width: 1920 } }],
+        { compress: 1, format: ImageManipulator.SaveFormat.JPEG },
+      );
+      setImage(manipulatedResult.uri);
+    }
+  };
+
   const handleUpdate = async () => {
+    if (
+      !blogData.title ||
+      !blogData.content ||
+      !blogData.category.name ||
+      !image
+    ) {
+      Alert.alert("Error", "Please fill all fields and select an image.");
+      return;
+    }
+
     setLoading(true);
     try {
-      await axios
-      .put(`https://6a0c36795aa893e1015b34cf.mockapi.io/blog/${blogId}`, {
-        title: blogData.title,
-        content: blogData.content,
-        image: blogData.image,
-        category: blogData.category,
-        totalLikes: blogData.totalLikes,
-        totalComments: blogData.totalComments,
-      })
-      .then((response) => {
-        console.log(response.data);
-      })
-      .catch(function (error) {
-        console.log(error);
-      });
+      let publicUrl = oldImage;
+
+      if (image !== oldImage) {
+        let filename = image.substring(image.lastIndexOf("/") + 1);
+        const extension = filename.split(".").pop();
+        const name = filename.split(".").slice(0, -1).join(".");
+        filename = name + Date.now() + "." + extension;
+        const response = await fetch(image);
+        const arrayBuffer = await response.arrayBuffer();
+
+        const { error: uploadError } = await supabase.storage
+          .from("woco")
+          .upload(filename, arrayBuffer, {
+            contentType: "image/jpeg",
+          });
+
+        if (uploadError) throw uploadError;
+
+        const {
+          data: { publicUrl: newUrl },
+        } = supabase.storage.from("woco").getPublicUrl(filename);
+
+        publicUrl = newUrl;
+      }
+
+      const { error } = await supabase
+        .from("blogs")
+        .update({
+          title: blogData.title,
+          category: blogData.category.name,
+          image: publicUrl,
+          content: blogData.content,
+        })
+        .eq("id", blogId);
+
+      if (error) throw error;
 
       setLoading(false);
       navigation.navigate("BlogDetail", { blogId });
     } catch (error) {
       console.error(error);
       setLoading(false);
+      Alert.alert("Error", "Failed to update blog");
     }
   };
 
@@ -140,15 +210,6 @@ const EditBlogForm = ({ route }) => {
             style={textInput.content}
           />
         </View>
-        <View style={textInput.borderDashed}>
-          <TextInput
-            placeholder="Image"
-            value={blogData.image}
-            onChangeText={(text) => handleChange("image", text)}
-            placeholderTextColor={colors.orange(0.6)}
-            style={textInput.content}
-          />
-        </View>
         <View style={[textInput.borderDashed]}>
           <Text
             style={{
@@ -185,6 +246,57 @@ const EditBlogForm = ({ route }) => {
             })}
           </View>
         </View>
+        {image ? (
+          <View style={{ position: "relative" }}>
+            <Image
+              style={{ width: "100%", height: 127, borderRadius: 5 }}
+              source={image}
+              contentFit="cover"
+            />
+            <TouchableOpacity
+              style={{
+                position: "absolute",
+                top: -5,
+                right: -5,
+                backgroundColor: colors.blue(),
+                borderRadius: 25,
+              }}
+              onPress={() => setImage(null)}
+            >
+              <Add
+                size={20}
+                variant="Linear"
+                color={colors.green()}
+                style={{ transform: [{ rotate: "45deg" }] }}
+              />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity onPress={handleImagePick}>
+            <View
+              style={[
+                textInput.borderDashed,
+                {
+                  gap: 10,
+                  paddingVertical: 30,
+                  justifyContent: "center",
+                  alignItems: "center",
+                },
+              ]}
+            >
+              <AddSquare color={colors.orange(0.6)} variant="Linear" size={42} />
+              <Text
+                style={{
+                  fontFamily: "Pjs-Regular",
+                  fontSize: 12,
+                  color: colors.orange(0.6),
+                }}
+              >
+                Upload Thumbnail
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
       </ScrollView>
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.button} onPress={handleUpdate}>

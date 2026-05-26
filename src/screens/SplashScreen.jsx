@@ -1,15 +1,51 @@
+import React, { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { colors } from "../../assets/theme";
 import { useNavigation } from "@react-navigation/native";
-import React, { useEffect } from "react";
+
+// Fixed: Added the missing AsyncStorage import
+import AsyncStorage from "@react-native-async-storage/async-storage"; 
 
 const SplashScreen = () => {
   const navigation = useNavigation();
+
   useEffect(() => {
-    setTimeout(() => {
-        navigation.replace("Login");
-      }, 1500);
+    checkToken();
   }, []);
+
+  const checkToken = async () => {
+    try {
+      const userDataJSON = await AsyncStorage.getItem("userData");
+      
+      // Cleaned up nesting: If there's no data, route straight to Login
+      if (!userDataJSON) {
+        navigateTo("Login");
+        return;
+      }
+
+      const userData = JSON.parse(userDataJSON);
+      const { token, expires } = userData;
+      const currentTime = new Date().getTime();
+
+      // Check if token exists and is still valid
+      if (token && expires && currentTime <= expires) {
+        navigateTo("MainApp");
+      } else {
+        navigateTo("Login");
+      }
+    } catch (error) {
+      console.error("Error retrieving token data:", error);
+      navigateTo("Login");
+    }
+  };
+
+  // Helper function to handle delayed navigation cleanly
+  const navigateTo = (screenName) => {
+    setTimeout(() => {
+      navigation.replace(screenName);
+    }, 1500);
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.logo}>SportGuide</Text>

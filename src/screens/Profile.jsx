@@ -7,10 +7,10 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Pressable, // Clean up: you can merge Pressable here too!
 } from "react-native";
 import { Settings, Edit } from "lucide-react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { Pressable } from "react-native";
 import { Image } from "expo-image";
 import { ProfileData } from "../data/profiledata";
 import { BlogList } from "../data/blogs";
@@ -18,21 +18,84 @@ import ItemSmall from "../components/ItemSmall";
 import { colors } from "../../assets/theme";
 import { formatNumber } from "../utils/formatNumber";
 import axios from "axios";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../libs/supabase";
+import { useActionSheet } from "@expo/react-native-action-sheet";
+import AsyncStorage from "@react-native-async-storage/async-storage"; // Keep this one!
+import { formatDate } from "../utils/formatDate";
+
 
 const data = BlogList.slice(5);
 
 const Profile = () => {
+  // 1. Declare hooks right at the top
   const navigation = useNavigation();
+  const { showActionSheetWithOptions } = useActionSheet();
+
+  // 2. Initialize as an object since .single() returns an object
+  const [profileData, setProfileData] = useState({}); 
   const [loading, setLoading] = useState(true);
   const [blogData, setBlogData] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      await AsyncStorage.removeItem("userData");
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Login" }],
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
+  const openActionSheet = () => {
+    const options = ["Log out", "Cancel"];
+    const destructiveButtonIndex = 0;
+    const cancelButtonIndex = 1;
+
+    showActionSheetWithOptions(
+      {
+        options,
+        cancelButtonIndex,
+        destructiveButtonIndex,
+      },
+      (selectedIndex) => {
+        if (selectedIndex === 0) {
+          handleLogout();
+        }
+      }
+    );
+  };
+
+  const getDataProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data, error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", user.id) 
+          .single(); 
+
+        if (error) throw error;
+        setProfileData(data || {}); 
+      }
+    } catch (error) {
+      console.error("Error fetching profile:", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getDataBlog = async () => {
     try {
-      const response = await axios.get(
-        "https://6a0c36795aa893e1015b34cf.mockapi.io/blog",
-      );
-      setBlogData(response.data);
-      setLoading(false);
+      const { data, error } = await supabase.from("blogs").select("*");
+      if (error) throw error;
+      setBlogData(data);
     } catch (error) {
       console.error(error);
     }
@@ -40,22 +103,22 @@ const Profile = () => {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => {
-      getDataBlog();
-      setRefreshing(false);
-    }, 1500);
+    getDataProfile();
+    getDataBlog();
+    setRefreshing(false);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
+      getDataProfile();
       getDataBlog();
-    }, []),
+    }, [])
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={openActionSheet}>
           <Settings color={colors.black()} size={24} />
         </TouchableOpacity>
       </View>
@@ -68,38 +131,40 @@ const Profile = () => {
         }
       >
         <View style={styles.profileHeader}>
-          <Image
-            style={profile.pic}
-            source={{
-              uri: ProfileData.profilePict,
-              headers: { Authorization: "someAuthToken" },
-            }}
-            contentFit="cover"
-            transition={200}
-            priority="high"
-          />
+          {profileData.photo_url && (
+            <Image
+              style={profile.pic}
+              source={{
+                uri: profileData.photo_url,
+                headers: { Authorization: "someAuthToken" },
+              }}
+              contentFit="cover"
+              transition={200}
+              priority="high"
+            />
+          )}
 
           <View style={{ gap: 5, alignItems: "center" }}>
-            <Text style={profile.name}>{ProfileData.name}</Text>
+            <Text style={profile.name}>{profileData.full_name || "Anonymous"}</Text>
             <Text style={profile.info}>
-              Member since {ProfileData.createdAt}
+              Member since {profileData.created_at ? formatDate(profileData.created_at) : "--"}
             </Text>
           </View>
 
           <View style={profile.statsContainer}>
             <View style={profile.statItem}>
-              <Text style={profile.sum}>{ProfileData.blogPosted}</Text>
+              <Text style={profile.sum}>{profileData.total_post || 0}</Text>
               <Text style={profile.tag}>Posted</Text>
             </View>
             <View style={profile.statItem}>
               <Text style={profile.sum}>
-                {formatNumber(ProfileData.following)}
+                {formatNumber(profileData.following_count || 0)}
               </Text>
               <Text style={profile.tag}>Following</Text>
             </View>
             <View style={profile.statItem}>
               <Text style={profile.sum}>
-                {formatNumber(ProfileData.follower)}
+                {formatNumber(profileData.followers_count || 0)}
               </Text>
               <Text style={profile.tag}>Follower</Text>
             </View>
@@ -113,13 +178,16 @@ const Profile = () => {
         <View style={styles.blogList}>
           {loading ? (
             <ActivityIndicator size={"large"} color={colors.blue()} />
+          ) : blogData.length > 0 ? (
+            blogData.map((item, index) => <ItemSmall item={item} key={index} />)
           ) : (
-            blogData.map((item, index) => (
-              <ItemSmall item={item} key={index} />
-            ))
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No posts yet.</Text>
+            </View>
           )}
         </View>
       </ScrollView>
+
       <Pressable
         style={({ pressed }) => [
           styles.floatingButton,
@@ -132,7 +200,7 @@ const Profile = () => {
       >
         <Edit color={colors.green()} size={20} />
       </Pressable>
-    </View>
+    </SafeAreaView>
   );
 };
 

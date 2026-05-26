@@ -13,8 +13,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
-import { colors, fontType } from "../../assets/theme";
+import { colors } from "../../assets/theme";
 import { Eye, EyeOff } from "lucide-react-native";
+import { supabase } from "../libs/supabase"; 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -23,27 +25,57 @@ const Login = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [isLoginDisabled, setLoginDisabled] = useState(true);
   const [loading, setLoading] = useState(false);
+
   const handleLogin = async () => {
     setLoading(true);
-    setTimeout(()=>{
-        navigation.navigate("MainApp");
-    },1500)
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
+
+      if (error) {
+        if (error.message === "Invalid login credentials") {
+          Alert.alert("Error", "Email atau Password salah");
+        } else {
+          Alert.alert("Error", error.message);
+        }
+        setLoading(false);
+        return;
+      }
+
+      if (data?.session) {
+        const currentTime = new Date().getTime();
+        await AsyncStorage.setItem(
+          "userData",
+          JSON.stringify({
+            token: data.session.access_token,
+            expires: currentTime + data.session.expires_in * 1000,
+          })
+        );
+      }
+  
+      setLoading(false);
+      navigation.navigate("MainApp");
+    } catch (error) {
+      console.log(error);
+      Alert.alert("Error", error.message);
+      setLoading(false);
+    }
   };
 
   const togglePasswordVisibility = () => {
     setPasswordVisible(!passwordVisible);
   };
 
-  const updateLoginButtonStatus = () => {
+  useEffect(() => {
     if (email.trim() && password.trim()) {
       setLoginDisabled(false);
     } else {
       setLoginDisabled(true);
     }
-  };
-  useEffect(() => {
-    updateLoginButtonStatus();
   }, [email, password]);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.green() }}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -61,12 +93,10 @@ const Login = () => {
                     placeholder="Enter your email address"
                     placeholderTextColor={colors.orange(0.6)}
                     value={email}
-                    onChangeText={(text) => {
-                      setEmail(text);
-                      updateLoginButtonStatus();
-                    }}
+                    onChangeText={(text) => setEmail(text)} // Simplified
                     inputMode="email"
                     keyboardType="email-address"
+                    autoCapitalize="none"
                     style={textinput.text}
                   />
                 </View>
@@ -88,26 +118,16 @@ const Login = () => {
                     placeholder="Enter password"
                     placeholderTextColor={colors.orange(0.6)}
                     value={password}
-                    onChangeText={(text) => {
-                      setPassword(text);
-                      updateLoginButtonStatus();
-                    }}
+                    onChangeText={(text) => setPassword(text)} // Simplified
                     secureTextEntry={!passwordVisible}
+                    autoCapitalize="none"
                     style={[textinput.text, { flex: 1 }]}
                   />
                   <TouchableOpacity onPress={togglePasswordVisibility}>
                     {passwordVisible ? (
-                      <Eye
-                        variant="Linear"
-                        color={colors.orange(0.6)}
-                        size={20}
-                      />
+                      <Eye color={colors.orange(0.6)} size={20} />
                     ) : (
-                      <EyeOff
-                        variant="Linear"
-                        color={colors.orange(0.6)}
-                        size={20}
-                      />
+                      <EyeOff color={colors.orange(0.6)} size={20} />
                     )}
                   </TouchableOpacity>
                 </View>
@@ -126,7 +146,7 @@ const Login = () => {
               ]}
               underlayColor={colors.blue(0.9)}
               onPress={handleLogin}
-              disabled={isLoginDisabled}
+              disabled={isLoginDisabled || loading} // Prevent double submittal
             >
               {loading ? (
                 <ActivityIndicator color={colors.green()} />
@@ -177,6 +197,7 @@ const styles = StyleSheet.create({
     gap: 20,
   },
 });
+
 const textinput = StyleSheet.create({
   label: {
     fontFamily: "Pjs-Medium",
@@ -197,6 +218,7 @@ const textinput = StyleSheet.create({
     fontFamily: "Pjs-Regular",
   },
 });
+
 const button = StyleSheet.create({
   container: {
     borderRadius: 10,

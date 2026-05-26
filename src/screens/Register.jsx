@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { colors } from "../../assets/theme";
 import { Eye, EyeOff } from "lucide-react-native";
+import { supabase } from "../libs/supabase";
 
 const Register = () => {
   const [fullName, setFullName] = useState("");
@@ -49,7 +50,40 @@ const Register = () => {
       return;
     }
 
+    setLoading(true);
+    try {
+      const { data: authData, error: signUpError } = await supabase.auth.signUp(
+        { email, password },
+      );
+      if (signUpError) throw signUpError;
+
+      const { error: insertError } = await supabase.from("users").upsert({
+        id: authData.user.id,
+        full_name: fullName,
+        email: email,
+        photo_url: `https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=2680&q=80`,
+        followers_count: 0,
+        following_count: 0,
+        total_post: 0,
+        created_at: new Date().toISOString(),
+      });
+
+      if (insertError) {
+        console.error("Insert error:", insertError);
+        throw insertError;
+      }
+
+      console.log("User added!");
+
+      setLoading(false);
+      navigation.navigate("Login");
+    } catch (error) {
+      setLoading(false);
+      console.log("Registration Error:", error);
+      Alert.alert("Error", error.message);
+    }
   };
+
 
   const togglePasswordVisibility = () => {
     setPasswordVisible(!passwordVisible);

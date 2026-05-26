@@ -3,16 +3,50 @@ import {
   View,
   Text,
   TextInput,
-  Pressable,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  TouchableOpacity
+  TouchableOpacity,
+  Alert,
 } from "react-native";
-import { ArrowLeft } from "lucide-react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { ArrowLeft, Plus, SquarePlus } from "lucide-react-native";
 import { useNavigation } from "@react-navigation/native";
 import { colors } from "../../assets/theme";
-import axios from "axios";
+import { supabase } from "../libs/supabase";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
+
+const handleImagePick = async () => {
+    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!permissionResult.granted) {
+      Alert.alert(
+        "Permission required",
+        "Permission to access the camera is required.",
+      );
+      return;
+    }
+
+    let result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 1,
+    });
+
+    console.log("result", result);
+
+    if (!result.canceled) {
+      const manipulatedResult = await ImageManipulator.manipulateAsync(
+        result.assets[0].uri,
+        [{ resize: { width: 1920, height: 1080 } }],
+        { compress: 1, format: ImageManipulator.SaveFormat.JPEG },
+      );
+      setImage(manipulatedResult.uri);
+    }
+  };
 
 
 const AddBlogForm = () => {
@@ -47,43 +81,68 @@ const AddBlogForm = () => {
   };
 
 const handleUpload = async () => {
+    let filename = image.substring(image.lastIndexOf("/") + 1);
+    const extension = filename.split(".").pop();
+    const name = filename.split(".").slice(0, -1).join(".");
+    filename = name + Date.now() + "." + extension;
+    const fileImage = await fetch(image);
+    const arrayBuffer = await fileImage.arrayBuffer();
     setLoading(true);
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from("woco")
+      .upload(filename, arrayBuffer, {
+        contentType: "image/jpeg",
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error("Upload Error:", uploadError);
+      Alert.alert("Error", uploadError.message);
+      setLoading(false);
+      return;
+    }
+
+    const {
+      data: { publicUrl },
+    } = await supabase.storage.from("woco").getPublicUrl(filename);
+
     try {
-      await axios
-        .post("https://6a0c36795aa893e1015b34cf.mockapi.io/blog", {
-          title: blogData.title,
-          category: blogData.category,
-          image,
-          content: blogData.content,
-          totalComments: blogData.totalComments,
-          totalLikes: blogData.totalLikes,
-          createdAt: new Date(),
-        })
-        .then(function (response) {
-          console.log(response);
-        })
-        .catch(function (error) {
-          console.log(error);
-        });
+      const { data: insertData, error: insertError } = await supabase.from("blogs").insert({
+        title: blogData.title,
+        category: blogData.category.name,
+        image: publicUrl,
+        content: blogData.content,
+        totalComments: blogData.totalComments,
+        totalLikes: blogData.totalLikes,
+        createdAt: new Date(),
+      });
+
+      if (insertError) {
+        console.error("Insert Error:", insertError);
+        Alert.alert("Error", insertError.message);
+        setLoading(false);
+        return;
+      }
+
       setLoading(false);
       navigation.navigate("MainApp", { screen: "Profile" });
-    } catch (e) {
-      console.log(e);
+    } catch (error) {
+      console.log(error);
     }
   };
 
 
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
           <ArrowLeft color={colors.black()} variant="Linear" size={24} />
-        </Pressable>
+        </TouchableOpacity>
         <View style={{ flex: 1, alignItems: "center" }}>
           <Text style={styles.title}>Write blog</Text>
         </View>
       </View>
-
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 24,
@@ -101,7 +160,6 @@ const handleUpload = async () => {
             style={textInput.title}
           />
         </View>
-
         <View style={[textInput.borderDashed, { minHeight: 250 }]}>
           <TextInput
             placeholder="Content"
@@ -112,18 +170,7 @@ const handleUpload = async () => {
             style={textInput.content}
           />
         </View>
-
-        <View style={textInput.borderDashed}>
-          <TextInput
-            placeholder="Image"
-            value={image}
-            onChangeText={(text) => setImage(text)}
-            placeholderTextColor={colors.orange(0.6)}
-            style={textInput.content}
-          />
-        </View>
-
-        <View style={textInput.borderDashed}>
+        <View style={[textInput.borderDashed]}>
           <Text style={category.title}>Category</Text>
           <View style={category.container}>
             {dataCategory.map((item, index) => {
@@ -135,39 +182,85 @@ const handleUpload = async () => {
                 item.id === blogData.category.id
                   ? colors.green()
                   : colors.orange();
-
               return (
-                <Pressable
+                <TouchableOpacity
                   key={index}
                   onPress={() =>
                     handleChange("category", { id: item.id, name: item.name })
                   }
-                  style={({ pressed }) => [
-                    category.item,
-                    { backgroundColor: bgColor, opacity: pressed ? 0.7 : 1 },
-                  ]}
+                  style={[category.item, { backgroundColor: bgColor }]}
                 >
                   <Text style={[category.name, { color: color }]}>
                     {item.name}
                   </Text>
-                </Pressable>
+                </TouchableOpacity>
               );
             })}
           </View>
         </View>
+        {image ? (
+          <View style={{ position: "relative" }}>
+            <Image
+              style={{ width: "100%", height: 127, borderRadius: 5 }}
+              source={image}
+              contentFit="cover"
+            />
+            <TouchableOpacity
+              style={{
+                position: "absolute",
+                top: -5,
+                right: -5,
+                backgroundColor: colors.blue(),
+                borderRadius: 25,
+              }}
+              onPress={() => setImage(null)}
+            >
+              <Plus
+                size={20}
+                variant="Linear"
+                color={colors.green()}
+                style={{ transform: [{ rotate: "45deg" }] }}
+              />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity onPress={handleImagePick}>
+            <View
+              style={[
+                textInput.borderDashed,
+                {
+                  gap: 10,
+                  paddingVertical: 30,
+                  justifyContent: "center",
+                  alignItems: "center",
+                },
+              ]}
+            >
+              <SquarePlus color={colors.orange(0.6)} variant="Linear" size={42} />
+              <Text
+                style={{
+                  fontFamily: "Pjs-Regular",
+                  fontSize: 12,
+                  color: colors.orange(0.6),
+                }}
+              >
+                Upload Thumbnail
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
       </ScrollView>
-
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.button} onPress={handleUpload}>
           <Text style={styles.buttonLabel}>Upload</Text>
-</TouchableOpacity>
+        </TouchableOpacity>
       </View>
       {loading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={colors.blue()} />
         </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
